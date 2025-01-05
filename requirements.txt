@@ -1,2 +1,7 @@
-
 plotly
+streamlit
+transformers
+torch
+PyPDF2
+pandas
+numpy

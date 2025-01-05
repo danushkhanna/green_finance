@@ -2,55 +2,94 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import numpy as np
+from transformers import pipeline
+import PyPDF2
+import io
 
-# Sample Data
-projects = ['Project A', 'Project B', 'Project C', 'Project D']
-esg_scores = [85, 70, 95, 60]  # ESG Scores out of 100
-risks = [0.2, 0.5, 0.1, 0.4]  # Risk as a fraction (0 = Low, 1 = High)
-min_allocations = [20000, 15000, 25000, 10000]  # Minimum required budget allocations
-total_budget = 75000  # Default budgets
+# Initialize BERT pipeline for text classification
+@st.cache_resource
+def load_model():
+    return pipeline("text-classification", 
+                   model="yiyanghkust/finbert-esg",
+                   return_all_scores=True)
+
+classifier = load_model()
+
+# Function to extract text from PDF
+def extract_text_from_pdf(file):
+    pdf_reader = PyPDF2.PdfReader(file)
+    text = ""
+    for page in pdf_reader.pages:
+        text += page.extract_text()
+    return text
+
+# Function to analyze ESG components
+def analyze_esg(text):
+    # Split text into chunks (BERT has token limits)
+    chunks = [text[i:i+512] for i in range(0, len(text), 512)]
+    
+    results = []
+    for chunk in chunks:
+        result = classifier(chunk)[0]
+        results.append(result)
+    
+    # Average scores across chunks
+    esg_scores = {
+        'Environmental': np.mean([r[0]['score'] for r in results]) * 100,
+        'Social': np.mean([r[1]['score'] for r in results]) * 100,
+        'Governance': np.mean([r[2]['score'] for r in results]) * 100
+    }
+    
+    return esg_scores
 
 # Streamlit App
-st.markdown("<h1 style='text-align: center;'>Green Finance Optimiser</h1>",unsafe_allow_html=True)
-#st.write("### Visualizing ESG Scores, Budget Allocation, and Risk Analysis")
-files=st.file_uploader("Upload File",type=["pdf"])
+st.markdown("<h1 style='text-align: center;'>Green Finance Optimiser</h1>", unsafe_allow_html=True)
 
-# Dynamic Budget Slider
-budget = st.slider("Adjust Budget", min_value=50000, max_value=100000, step=5000, value=total_budget)
-st.write(f"#### Current Budget: ₹{budget:,}")
+# File upload
+uploaded_file = st.file_uploader("Upload Project Document", type=["pdf"])
 
-# Budget Allocation Logic
-allocations = np.minimum(min_allocations, (budget / sum(min_allocations)) * np.array(min_allocations))
-remaining_budget = budget - sum(allocations)
+if uploaded_file is not None:
+    # Extract text from PDF
+    text = extract_text_from_pdf(uploaded_file)
+    
+    # Analyze ESG components
+    esg_scores = analyze_esg(text)
+    
+    # Calculate risk score (simplified example)
+    risk_score = 1 - (sum(esg_scores.values()) / (100 * 3))
+    
+    # Create DataFrame for visualization
+    projects = ['Current Project']
+    data = pd.DataFrame({
+        'Project': projects,
+        'Environmental Score': [esg_scores['Environmental']],
+        'Social Score': [esg_scores['Social']],
+        'Governance Score': [esg_scores['Governance']],
+        'Risk (Low = Good)': [risk_score],
+    })
 
-# DataFrame for Display
-data = pd.DataFrame({
-    'Project': projects,
-    'ESG Score': esg_scores,
-    'Risk (Low = Good)': risks,
-    'Min Allocation (₹)': min_allocations,
-    'Allocated Budget (₹)': allocations
-})
+    # Budget slider
+    budget = st.slider("Adjust Budget", min_value=50000, max_value=100000, step=5000, value=75000)
+    st.write(f"#### Current Budget: ₹{budget:,}")
 
-# Pie Chart for Budget Allocation
-st.write("### Budget Allocation")
-fig_pie = px.pie(data, values='Allocated Budget (₹)', names='Project', title="Budget Allocation by Project")
-st.plotly_chart(fig_pie)
+    # Visualizations
+    st.write("### ESG Component Scores")
+    fig_bar = px.bar(
+        data.melt(id_vars=['Project'], 
+                  value_vars=['Environmental Score', 'Social Score', 'Governance Score']),
+        x='variable',
+        y='value',
+        title="ESG Component Analysis",
+        labels={'value': 'Score', 'variable': 'Component'}
+    )
+    st.plotly_chart(fig_bar)
 
-# Bar Chart for ESG Scores
-st.write("### ESG Scores")
-fig_bar = px.bar(data, x='Project', y='ESG Score', title="ESG Scores of Projects", color='ESG Score', text='ESG Score')
-fig_bar.update_traces(texttemplate='%{text:.2s}', textposition='outside')
-st.plotly_chart(fig_bar)
+    # Risk Analysis
+    st.write("### Risk Analysis")
+    fig_gauge = px.bar(data, x='Project', y='Risk (Low = Good)', 
+                      title="Project Risk Assessment")
+    st.plotly_chart(fig_gauge)
 
-# Line Chart for Risk Analysis
-st.write("### Risk Analysis")
-fig_line = px.line(data, x='Project', y='Risk (Low = Good)', title="Risk Analysis by Project", markers=True)
-st.plotly_chart(fig_line)
-
-# Display Table
-st.write("### Detailed Project Breakdown")
-st.table(data)
-
-# Display Remaining Budget
-st.write(f"#### Remaining Budget: ₹{remaining_budget:,}")
+    # Display detailed breakdown
+    st.write("### Detailed Project Breakdown")
+    st.table(data)
