@@ -8,7 +8,7 @@ projects = ['Project A', 'Project B', 'Project C', 'Project D']
 esg_scores = [85, 70, 95, 60]  # ESG Scores out of 100
 risks = [0.2, 0.5, 0.1, 0.4]  # Risk as a fraction (0 = Low, 1 = High)
 min_allocations = [20000, 15000, 25000, 10000]  # Minimum required budget allocations
-total_budget = 75000  # Default budget
+total_budget = 75000  # Default budgets
 
 # Streamlit App
 st.markdown("<h1 style='text-align: center;'>Green Finance Optimiser</h1>",unsafe_allow_html=True)
