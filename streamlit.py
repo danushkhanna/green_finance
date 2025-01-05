@@ -15,13 +15,16 @@ def load_model():
 
 classifier = load_model()
 
-# Function to extract text from PDF
-def extract_text_from_pdf(file):
-    pdf_reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text()
-    return text
+# Function to extract text from PDF or TXT
+def extract_text(file, file_type):
+    if file_type == "pdf":
+        pdf_reader = PyPDF2.PdfReader(file)
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text()
+        return text
+    else:  # txt file
+        return file.getvalue().decode("utf-8")
 
 # Function to analyze ESG components
 def analyze_esg(text):
@@ -45,12 +48,13 @@ def analyze_esg(text):
 # Streamlit App
 st.markdown("<h1 style='text-align: center;'>Green Finance Optimiser</h1>", unsafe_allow_html=True)
 
-# File upload
-uploaded_file = st.file_uploader("Upload Project Document", type=["pdf"])
+# Modified file upload to accept both PDF and TXT
+uploaded_file = st.file_uploader("Upload Project Document", type=["pdf", "txt"])
 
 if uploaded_file is not None:
-    # Extract text from PDF
-    text = extract_text_from_pdf(uploaded_file)
+    # Determine file type and extract text
+    file_type = uploaded_file.name.split('.')[-1].lower()
+    text = extract_text(uploaded_file, file_type)
     
     # Analyze ESG components
     esg_scores = analyze_esg(text)
