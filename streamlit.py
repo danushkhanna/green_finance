@@ -24,7 +24,19 @@ def extract_text(file, file_type):
             text += page.extract_text()
         return text
     else:  # txt file
-        return file.getvalue().decode("utf-8")
+        # Try different encodings
+        encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        content = file.getvalue()
+        
+        for encoding in encodings:
+            try:
+                return content.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        
+        # If no encoding worked, inform the user
+        st.error("Could not decode the text file. Please ensure it's properly encoded.")
+        return ""
 
 # Function to analyze ESG components
 def analyze_esg(text):
